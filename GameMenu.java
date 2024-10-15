@@ -5,13 +5,12 @@ import javax.sound.sampled.*;
 import java.io.*;
 import javax.swing.*;
 
-
 public class GameMenu extends JPanel implements ActionListener {
     private JFrame frame;
-    private JButton playButton, loadMemoryButton, settingsButton, helpButton, exitButton;
+    private JButton playButton, loadMemoryButton, settingsButton, helpButton, exitButton, backButton;
     private JLabel title, subtitle;
     private JTextArea helpTextArea;
-    private Image cursorImage;
+    private Image cursorImage, adam;
     private Cursor customCursor;
     private Timer timer;
     private int introStep = 0;
@@ -24,12 +23,14 @@ public class GameMenu extends JPanel implements ActionListener {
     private boolean reverseMenu = false; // Track if we are reversing the menu
     private int buttonXPosition = -300;  // Start buttons off-screen
     private int helpTextXPosition = -400;
+    private int adamImageYPosition;
     private Square[] squares; // Array of squares for background animation
     private int squareSpeed = 2; // Speed of square movement
     private boolean helpActive = false;
+    private boolean showAdamImage = false;
     private int titleTargetY = 600;  // Bottom-left position for title
     private int subtitleTargetY = 660;  // Bottom-left position for subtitle
-
+    
     public GameMenu() {
         // Load custom fonts and cursor once
         loadResources();
@@ -53,6 +54,8 @@ public class GameMenu extends JPanel implements ActionListener {
 
         // Initialize squares for background animation
         initializeSquares();
+        
+        adamImageYPosition = getHeight(); // Start below the screen
 
         // Timer for animations
         timer = new Timer(30, this);
@@ -70,6 +73,7 @@ public class GameMenu extends JPanel implements ActionListener {
             customTextFont = Font.createFont(Font.TRUETYPE_FONT, new File("Gugi.ttf")).deriveFont(20f);
             cursorImage = Toolkit.getDefaultToolkit().getImage("cursor.png");
             customCursor = Toolkit.getDefaultToolkit().createCustomCursor(cursorImage, new Point(0, 0), "Custom Cursor");
+            adam = Toolkit.getDefaultToolkit().getImage("adam.png");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -115,11 +119,26 @@ public class GameMenu extends JPanel implements ActionListener {
         helpTextArea.setFont(customTextFont);
         helpTextArea.setBackground(new Color(0, 0, 0, 0));
         helpTextArea.setForeground(Color.WHITE);
+        helpTextArea.setEditable(false);
         helpTextArea.setLineWrap(true);
         helpTextArea.setWrapStyleWord(true);
-        helpTextArea.setBounds(-400, 200, 800, 400); // Set initial position off-screen
+        helpTextArea.setBounds(-400, 200, 700, 450); // Set initial position off-screen
         helpTextArea.setVisible(false);  // Initially hidden
         add(helpTextArea);
+        
+        backButton = createButton("Back", buttonXPosition, 640); // Position it below the exit button
+        backButton.setVisible(false); // Initially hidden
+        backButton.addActionListener(e -> {
+            showHelp = false;  // Hide help content
+            helpTextArea.setVisible(false); // Hide the help text area
+            backButton.setVisible(false); // Hide the back button
+            reverseMenu = false;    // Reset reverse menu flag
+            buttonXPosition = -300;  // Reset button position off-screen
+            updateButtonPositions(buttonXPosition); // Update button positions to reset
+            helpTextXPosition = -400; // Reset help text position
+        });
+        add(backButton);
+
 
         exitButton.addActionListener(e -> System.exit(0));  // Exit the program
 
@@ -194,6 +213,7 @@ public class GameMenu extends JPanel implements ActionListener {
             }
             helpTextArea.setText(content.toString());
             helpTextArea.setVisible(true);  // Make it visible after loading content
+            backButton.setVisible(true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -202,32 +222,40 @@ public class GameMenu extends JPanel implements ActionListener {
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
-
+    
         // Handle the intro sequence
         if (introStep < introTexts.length) {
             drawIntroText(g2d);
         } else if (showMenu) {
-            // Show the menu after intro
             drawMenuAnimation();
         }
-
+    
         // Draw background animation
         if (showMenu) {
             drawBackground(g2d);
         }
-
+        
+        if (showAdamImage) {
+            int scaledHeight = getHeight();
+            int scaledWidth = (int)((float)adam.getWidth(null) / adam.getHeight(null) * scaledHeight);
+            Image scaledImage = adam.getScaledInstance(scaledWidth, scaledHeight, Image.SCALE_SMOOTH);
+            g.drawImage(adam, getWidth() - adam.getWidth(null), adamImageYPosition, null);
+        }
+    
         // Reverse the menu when help is triggered
         if (reverseMenu && buttonXPosition > -300) {
             buttonXPosition -= 5;  // Move buttons off-screen
             updateButtonPositions(buttonXPosition);
         }
         
-            if (showHelp && helpTextXPosition < 50) {
+        // Update help text position
+        if (showHelp && helpTextXPosition < 50) {
             helpTextXPosition += 5;  // Move text area to the right
             helpTextArea.setLocation(helpTextXPosition, helpTextArea.getY());
+            backButton.setLocation(100, 650);
         }
     }
-
+    
     private void drawIntroText(Graphics2D g2d) {
         String introText = introTexts[introStep];
         g2d.setFont(introText.equals("In The Wildest Dimensions") ? customTitleFont : customMenuFont);
@@ -255,6 +283,15 @@ public class GameMenu extends JPanel implements ActionListener {
             showMenu = true;  // Set showMenu to true after intro finishes
             title.setVisible(true);  // Show title
         }
+        
+        if (introStep >= introTexts.length && !showAdamImage) {
+            showAdamImage = true; // Start showing the image
+        }
+        
+        if (showAdamImage && adamImageYPosition > getHeight() - adam.getHeight(null)) {
+            adamImageYPosition -= 5; // Move the image up
+        }
+
     }
 
     private void drawMenuAnimation() {
