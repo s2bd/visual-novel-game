@@ -5,6 +5,12 @@ import javax.sound.sampled.*;
 import java.io.*;
 import javax.swing.*;
 
+/**
+ * Launches the game and the main menu screen
+ *
+ * @author Dewan Mukto
+ * @version 2024-10-15
+ */
 public class GameMenu extends JPanel implements ActionListener {
     private JFrame frame;
     private JButton playButton, loadMemoryButton, settingsButton, helpButton, exitButton, backButton;
@@ -16,7 +22,7 @@ public class GameMenu extends JPanel implements ActionListener {
     private int introStep = 0;
     private float introAlpha = 0f; // for fading effect
     private String[] introTexts = { "Dewan Mukto presents...", "a Muxday production", "In The Wildest Dimensions" };
-    private Clip hoverSound, clickSound;
+    private Clip themeSong, hoverSound, clickSound;
     private Font customTitleFont, customMenuFont, customTextFont;
     private boolean showMenu = false;
     private boolean showHelp = false;
@@ -63,6 +69,7 @@ public class GameMenu extends JPanel implements ActionListener {
 
         frame.add(this);
         frame.setVisible(true);
+        playThemeSound(); // Load and start playing the theme sound
     }
     
     private void loadResources() {
@@ -79,8 +86,16 @@ public class GameMenu extends JPanel implements ActionListener {
         }
 
         // Load Sounds once
+        themeSong = loadSound("theme.wav");
         hoverSound = loadSound("hover.wav");
         clickSound = loadSound("click.wav");
+    }
+    
+    private void playThemeSound() {
+        if (themeSong != null) {
+            themeSong.setFramePosition(0); // Reset the clip to the beginning
+            themeSong.loop(Clip.LOOP_CONTINUOUSLY); // Loop the sound continuously
+        }
     }
 
     private void initializeTitleAndSubtitle() {
