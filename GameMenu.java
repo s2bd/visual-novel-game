@@ -5,10 +5,12 @@ import javax.sound.sampled.*;
 import java.io.*;
 import javax.swing.*;
 
+
 public class GameMenu extends JPanel implements ActionListener {
     private JFrame frame;
     private JButton playButton, loadMemoryButton, settingsButton, helpButton, exitButton;
     private JLabel title, subtitle;
+    private JTextArea helpTextArea;
     private Image cursorImage;
     private Cursor customCursor;
     private Timer timer;
@@ -18,25 +20,19 @@ public class GameMenu extends JPanel implements ActionListener {
     private Clip hoverSound, clickSound;
     private Font customTitleFont, customMenuFont, customTextFont;
     private boolean showMenu = false;
+    private boolean showHelp = false;
+    private boolean reverseMenu = false; // Track if we are reversing the menu
     private int buttonXPosition = -300;  // Start buttons off-screen
+    private int helpTextXPosition = -400;
     private Square[] squares; // Array of squares for background animation
     private int squareSpeed = 2; // Speed of square movement
+    private boolean helpActive = false;
+    private int titleTargetY = 600;  // Bottom-left position for title
+    private int subtitleTargetY = 660;  // Bottom-left position for subtitle
 
     public GameMenu() {
-        // Load custom fonts
-        try {
-            customTitleFont = Font.createFont(Font.TRUETYPE_FONT, new File("eternal.ttf")).deriveFont(50f);
-            customMenuFont = Font.createFont(Font.TRUETYPE_FONT, new File("LeningradDisco.ttf")).deriveFont(24f);
-            customTextFont = Font.createFont(Font.TRUETYPE_FONT, new File("Gugi.ttf")).deriveFont(20f);
-            cursorImage = Toolkit.getDefaultToolkit().getImage("cursor.png");
-            customCursor = Toolkit.getDefaultToolkit().createCustomCursor(cursorImage, new Point(0, 0), "Custom Cursor");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        // Load Sounds
-        hoverSound = loadSound("hover.wav");
-        clickSound = loadSound("click.wav");
+        // Load custom fonts and cursor once
+        loadResources();
 
         // Setup Frame
         frame = new JFrame("In The Wildest Dimensions");
@@ -49,41 +45,14 @@ public class GameMenu extends JPanel implements ActionListener {
         setLayout(null);
         setBackground(Color.BLACK);
 
-        // Title with glitch effects (initially in the center for the intro)
-        title = new JLabel("In The Wildest Dimensions");
-        title.setFont(customTitleFont);
-        title.setForeground(Color.WHITE);
-        title.setBounds(340, 300, 1000, 80); // Centered initially
-        title.setVisible(false);  // Hide title during intro
-        add(title);
-        
-        // Subtitle for version information
-        subtitle = new JLabel("version 0.1 2024Oct15 early alpha");
-        subtitle.setFont(customTextFont);
-        subtitle.setForeground(Color.WHITE);
-        subtitle.setBounds(50, 80, 500, 30); // Position it below the title
-        subtitle.setVisible(false);  // Hide initially
-        add(subtitle);
+        // Initialize title and subtitle labels
+        initializeTitleAndSubtitle();
 
         // Create Menu Buttons (initially hidden)
-        playButton = createButton("Play", buttonXPosition, 360);
-        loadMemoryButton = createButton("Load Memory", buttonXPosition, 420);
-        settingsButton = createButton("Settings", buttonXPosition, 480);
-        helpButton = createButton("Help", buttonXPosition, 540);
-        exitButton = createButton("Exit", buttonXPosition, 600);
-
-        add(playButton);
-        add(loadMemoryButton);
-        add(settingsButton);
-        add(helpButton);
-        add(exitButton);
+        initializeButtons();
 
         // Initialize squares for background animation
-        int numSquares = 20; // Number of squares
-        squares = new Square[numSquares];
-        for (int i = 0; i < numSquares; i++) {
-            squares[i] = new Square(getWidth() + i * 64, (int)(Math.random() * getHeight())); // Random vertical position
-        }
+        initializeSquares();
 
         // Timer for animations
         timer = new Timer(30, this);
@@ -92,8 +61,83 @@ public class GameMenu extends JPanel implements ActionListener {
         frame.add(this);
         frame.setVisible(true);
     }
+    
+    private void loadResources() {
+        // Load custom fonts
+        try {
+            customTitleFont = Font.createFont(Font.TRUETYPE_FONT, new File("eternal.ttf")).deriveFont(50f);
+            customMenuFont = Font.createFont(Font.TRUETYPE_FONT, new File("LeningradDisco.ttf")).deriveFont(24f);
+            customTextFont = Font.createFont(Font.TRUETYPE_FONT, new File("Gugi.ttf")).deriveFont(20f);
+            cursorImage = Toolkit.getDefaultToolkit().getImage("cursor.png");
+            customCursor = Toolkit.getDefaultToolkit().createCustomCursor(cursorImage, new Point(0, 0), "Custom Cursor");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-    // Create a Button with hover effects
+        // Load Sounds once
+        hoverSound = loadSound("hover.wav");
+        clickSound = loadSound("click.wav");
+    }
+
+    private void initializeTitleAndSubtitle() {
+        title = new JLabel("In The Wildest Dimensions");
+        title.setFont(customTitleFont);
+        title.setForeground(Color.WHITE);
+        title.setBounds(340, 300, 1000, 80); // Centered initially
+        title.setVisible(false);  // Hide title during intro
+        add(title);
+        
+        subtitle = new JLabel("version 0.1 2024Oct15 early alpha");
+        subtitle.setFont(customTextFont);
+        subtitle.setForeground(Color.WHITE);
+        subtitle.setBounds(50, 80, 500, 30); // Position it below the title
+        subtitle.setVisible(false);  // Hide initially
+        add(subtitle);
+    }
+
+    private void initializeButtons() {
+        playButton = createButton("Play", buttonXPosition, 360);
+        loadMemoryButton = createButton("Load Memory", buttonXPosition, 420);
+        settingsButton = createButton("Settings", buttonXPosition, 480);
+        helpButton = createButton("Help", buttonXPosition, 540);
+        exitButton = createButton("Exit", buttonXPosition, 600);
+        
+        helpButton.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                playSound(clickSound);
+                reverseMenu = true;  // Trigger reverse animation
+                loadHelpContent();  // Load the help content when help button is pressed
+                showHelp = true;  // Set to show the help text
+            }
+        });
+        
+        helpTextArea = new JTextArea();
+        helpTextArea.setFont(customTextFont);
+        helpTextArea.setBackground(new Color(0, 0, 0, 0));
+        helpTextArea.setForeground(Color.WHITE);
+        helpTextArea.setLineWrap(true);
+        helpTextArea.setWrapStyleWord(true);
+        helpTextArea.setBounds(-400, 200, 800, 400); // Set initial position off-screen
+        helpTextArea.setVisible(false);  // Initially hidden
+        add(helpTextArea);
+
+        exitButton.addActionListener(e -> System.exit(0));  // Exit the program
+
+        add(playButton);
+        add(loadMemoryButton);
+        add(settingsButton);
+        add(helpButton);
+        add(exitButton);
+    }
+
+    private void initializeSquares() {
+        int numSquares = 20; // Number of squares
+        squares = new Square[numSquares];
+        for (int i = 0; i < numSquares; i++) {
+            squares[i] = new Square(getWidth() + i * 64, (int)(Math.random() * getHeight()));
+        }
+    }
+
     private JButton createButton(String text, int x, int y) {
         JButton button = new JButton(text);
         button.setFont(customMenuFont);
@@ -103,7 +147,6 @@ public class GameMenu extends JPanel implements ActionListener {
         button.setBackground(Color.BLACK);
         button.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
 
-        // Add hover and click effects
         button.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) {
                 button.setForeground(Color.YELLOW);
@@ -122,107 +165,121 @@ public class GameMenu extends JPanel implements ActionListener {
         return button;
     }
 
-    // Play Sound Clip
-    private void playSound(Clip clip) {
-        if (clip != null) {
-            clip.setFramePosition(0);  // Rewind
-            clip.start();
-        }
-    }
-
-    // Load Sound
     private Clip loadSound(String filename) {
         try {
-            File soundFile = new File(filename);
-            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
+            AudioInputStream audioStream = AudioSystem.getAudioInputStream(new File(filename));
             Clip clip = AudioSystem.getClip();
             clip.open(audioStream);
             return clip;
-        } catch (UnsupportedAudioFileException e) {
-            System.out.println("Unsupported audio file: " + filename);
-            e.printStackTrace();
-        } catch (IOException e) {
-            System.out.println("Error loading sound: " + filename);
-            e.printStackTrace();
-        } catch (LineUnavailableException e) {
-            System.out.println("Audio line unavailable: " + filename);
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
     }
 
-    // Paint Background, Intro Text, and Menu Transition
+    private void playSound(Clip clip) {
+        if (clip != null) {
+            clip.setFramePosition(0);
+            clip.start();
+        }
+    }
+    
+    private void loadHelpContent() {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader("help.txt"));
+            StringBuilder content = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+            helpTextArea.setText(content.toString());
+            helpTextArea.setVisible(true);  // Make it visible after loading content
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
 
         // Handle the intro sequence
         if (introStep < introTexts.length) {
-            Graphics2D g2d = (Graphics2D) g;
-
-            // Check if the current intro text is "In The Wildest Dimensions"
-            if (introTexts[introStep].equals("In The Wildest Dimensions")) {
-                g2d.setFont(customTitleFont);  // Set to customTitleFont
-            } else {
-                g2d.setFont(customMenuFont);  // Set to default menu font
-            }
-
-            // Clamp alpha value between 0 and 1 to avoid errors
-            float clampedAlpha = Math.max(0f, Math.min(1f, introAlpha));
-            g2d.setColor(new Color(1f, 1f, 1f, clampedAlpha));  // Use clampedAlpha
-
-            FontMetrics fm = g2d.getFontMetrics();
-            int textWidth = fm.stringWidth(introTexts[introStep]);
-            int textX = (getWidth() - textWidth) / 2;
-            int textY = getHeight() / 2;
-
-            g2d.drawString(introTexts[introStep], textX, textY);
+            drawIntroText(g2d);
+        } else if (showMenu) {
+            // Show the menu after intro
+            drawMenuAnimation();
         }
 
-        // Fade in/out transition
-        if (introAlpha < 1f && introStep < introTexts.length) {
-            introAlpha += 0.01f;  // Slower fading speed
-        } else if (introAlpha >= 1f) {
+        // Draw background animation
+        if (showMenu) {
+            drawBackground(g2d);
+        }
+
+        // Reverse the menu when help is triggered
+        if (reverseMenu && buttonXPosition > -300) {
+            buttonXPosition -= 5;  // Move buttons off-screen
+            updateButtonPositions(buttonXPosition);
+        }
+        
+            if (showHelp && helpTextXPosition < 50) {
+            helpTextXPosition += 5;  // Move text area to the right
+            helpTextArea.setLocation(helpTextXPosition, helpTextArea.getY());
+        }
+    }
+
+    private void drawIntroText(Graphics2D g2d) {
+        String introText = introTexts[introStep];
+        g2d.setFont(introText.equals("In The Wildest Dimensions") ? customTitleFont : customMenuFont);
+
+        // Clamp alpha value between 0 and 1
+        float clampedAlpha = Math.max(0f, Math.min(1f, introAlpha));
+        g2d.setColor(new Color(1f, 1f, 1f, clampedAlpha));
+
+        FontMetrics fm = g2d.getFontMetrics();
+        int textWidth = fm.stringWidth(introText);
+        int textX = (getWidth() - textWidth) / 2;
+        int textY = getHeight() / 2;
+        g2d.drawString(introText, textX, textY);
+
+        // Fade in/out effect
+        if (introAlpha < 1f) {
+            introAlpha += 0.01f;
+        } else {
             introAlpha = 0f;
             introStep++;
         }
 
-        // After intro, show the menu and animate buttons sliding in
-        if (introStep >= introTexts.length && !showMenu) {
-            title.setVisible(true);  // Display the title
-            showMenu = true;
-        }
-
-        // Animate title moving from center to top-left corner
-        if (showMenu && title.getY() > 20) {
-            title.setBounds(50, Math.max(20, title.getY() - 2), 1000, 80);  // Slower movement
-        }
-        
-        // Show subtitle when title is at the top-left
-        if (showMenu && title.getY() <= 20) {
-            subtitle.setVisible(true); // Show the subtitle
-        }
-
-        // Slide in buttons (slower)
-        if (showMenu && buttonXPosition < 50) {
-            buttonXPosition += 2;  // Slower button slide-in speed
-            playButton.setLocation(buttonXPosition, playButton.getY());
-            loadMemoryButton.setLocation(buttonXPosition, loadMemoryButton.getY());
-            settingsButton.setLocation(buttonXPosition, settingsButton.getY());
-            helpButton.setLocation(buttonXPosition, helpButton.getY());
-            exitButton.setLocation(buttonXPosition, exitButton.getY());
-        }
-
-        // Draw background animation only if the menu is shown
-        if (showMenu) {
-            drawBackground(g);
+        // After the last intro step, show the menu
+        if (introStep >= introTexts.length) {
+            showMenu = true;  // Set showMenu to true after intro finishes
+            title.setVisible(true);  // Show title
         }
     }
 
-    // Draw background animation
-    private void drawBackground(Graphics g) {
-        Graphics2D g2d = (Graphics2D) g;
+    private void drawMenuAnimation() {
+        if (title.getY() > 20) {
+            title.setLocation(50, Math.max(20, title.getY() - 2));  // Slower movement
+        }
+        if (title.getY() <= 20) {
+            subtitle.setVisible(true);  // Show subtitle
+        }
 
-        // Draw squares in the background
+        if (buttonXPosition < 50) {
+            buttonXPosition += 2;  // Slide buttons in
+            updateButtonPositions(buttonXPosition);
+        }
+    }
+
+    private void updateButtonPositions(int xPosition) {
+        playButton.setLocation(xPosition, playButton.getY());
+        loadMemoryButton.setLocation(xPosition, loadMemoryButton.getY());
+        settingsButton.setLocation(xPosition, settingsButton.getY());
+        helpButton.setLocation(xPosition, helpButton.getY());
+        exitButton.setLocation(xPosition, exitButton.getY());
+    }
+
+    private void drawBackground(Graphics2D g2d) {
         for (Square square : squares) {
             g2d.setColor(square.color);
             square.x -= squareSpeed; // Move square to the left
@@ -238,13 +295,13 @@ public class GameMenu extends JPanel implements ActionListener {
         }
     }
 
-    // Main Action Listener for timer events
     public void actionPerformed(ActionEvent e) {
-        repaint(); // Repaint the panel
+        // Repaint the panel every frame
+        repaint();
     }
 
-    // Square class representing the animated squares
-    class Square {
+    // Class to represent animated squares
+   class Square {
         int x, y;
         int size = 64; // Square size
         Color color;
@@ -257,6 +314,6 @@ public class GameMenu extends JPanel implements ActionListener {
     }
 
     public static void main(String[] args) {
-        new GameMenu(); // Launch the game menu
+        new GameMenu();
     }
 }
