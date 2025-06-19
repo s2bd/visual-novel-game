@@ -8,5 +8,5 @@ As of now, it contains:
 - [x] cinematic intro title sequence
 - [x] custom TTF font usage
 - [x] custom cursor
-- [x] tweening animations
+- [x] tweening animations, e.g. animated background
 - [ ] gameplay content (haha, you gotta wait for a while)
